@@ -37,22 +37,8 @@ helm install ambassador datawire/ambassador \
 
 kubectl rollout status deploy/ambassador -n seldon-system
 
-kubectl create ns minio
-helm repo add minio https://charts.min.io/
-helm install minio minio/minio \
-    --set accessKey=admin \
-    --set secretKey=password \
-    --namespace minio
-
-# if gui for minio needed
-# export POD_NAME=$(kubectl get pods --namespace minio -l "release=minio" -o jsonpath="{.items[0].metadata.name}")
-# kubectl port-forward $POD_NAME 9000 --namespace minio &
-
-mc alias set minio http://localhost:9000 "admin" "password" --api s3v4
-mc ls minio  # test
-mc mb minio/models
-# cp model directory
-mc cp --recursive models/$MODEL_NAME minio/models/animal-model/
+# run minio server in separate window
+#MINIO_ROOT_USER=admin MINIO_ROOT_PASSWORD=password minio server minio_data/
 
 
 kubectl apply -f kube_server_files/seldon_rclone.yaml
@@ -60,18 +46,17 @@ kubectl apply -f kube_server_files/seldon_rclone.yaml
 kubectl apply -f kube_dev_files/model_deploy.yaml
 
 # run port-forwarding in separate window
-kubectl port-forward $(kubectl get pods -n seldon-system -l app.kubernetes.io/name=ambassador -o jsonpath='{.items[0].metadata.name}') -n seldon-system 8003:8080
-
-curl -s http://localhost:8003/seldon/seldon-system/$MODEL_NAME/v2/models/$MODEL_NAME | jq .
-
+kubectl port-forward $(kubectl get pods -n seldon-system -l app.kubernetes.io/name=ambassador -o jsonpath='{.items[0].metadata.name}') -n seldon-system 8003:8080 &
 
 # Monitoring
-helm install seldon-core-analytics seldon-core-analytics \
-   --repo https://storage.googleapis.com/seldon-charts \
-   --namespace seldon-system
-kubectl rollout status deploy/seldon-core-analytics-grafana -n seldon-system
+#helm install seldon-core-analytics seldon-core-analytics \
+#   --repo https://storage.googleapis.com/seldon-charts \
+#   --namespace seldon-system
+#kubectl rollout status deploy/seldon-core-analytics-grafana -n seldon-system
+#
+## run port-forwarding in separate window
+#kubectl port-forward svc/seldon-core-analytics-grafana 3000:80 -n seldon-system &
 
-# run port-forwarding in separate window
-kubectl port-forward svc/seldon-core-analytics-grafana 3000:80 -n seldon-system
 
+curl -s http://localhost:8003/seldon/seldon-system/$MODEL_NAME/v2/models/$MODEL_NAME | jq .
 # web browser: http://localhost:3000
